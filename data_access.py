@@ -44,16 +44,20 @@ def load_shipments(directory):
     shipments = []
     for path in Path(directory).iterdir():
         if path.suffix == ".json":
-            shipment = path
-            shipments.append(shipment)
+            shipment = load_json(path)
+            
+            if isinstance(shipment, dict) and "shipment_id" in shipment:
+                shipments.append(shipment)
     return shipments
 
 def load_incidents(directory):
     incidents = []
     for path in Path(directory).iterdir():
         if path.suffix == ".json":
-            incident = path
-            incidents.append(incident)
+            incident = load_json(path)
+            
+            if isinstance(incident, dict) and "incident_id" in incident:
+                incidents.append(incident)
     return incidents
 
 def load_weather(path):

@@ -22,8 +22,10 @@ def classify_shipment(shipment):
     hazardous = shipment.get("hazardous", False)
     temperature_controlled = shipment.get("temperature_controlled", False)
     
-    if hazardous: return "CONTROLLED", "hazardoud cargo"
-    if temperature_controlled: return "COLD CHAIN", "temperature_controlled cargo"
+    if hazardous: 
+        return "CONTROLLED", "hazardous cargo"
+    if temperature_controlled: 
+        return "COLD CHAIN", "temperature-controlled cargo"
     if shipment["priority"] == "EXPRESS" or shipment["weight_kg"] >= 5000:
         return "EXPEDITE", "express service"
     
@@ -61,4 +63,6 @@ def build_weather_recommendations(wind, waves, rain):
         recommendations.append("Prepare covered handling.")
     if len(recommendations) == 0:
         recommendations.append("Normal operating plan.")
+    
     return " ".join(recommendations)
+    

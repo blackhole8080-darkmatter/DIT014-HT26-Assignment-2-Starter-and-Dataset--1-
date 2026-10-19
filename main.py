@@ -37,27 +37,41 @@ def inspect_vessel():
     
     port_calls = load_port_calls("dataset/port_calls.csv")
     upcoming_calls = []
+
     for call in port_calls:
-        if call["vessel_id"] == selected_vessel["vessel_id"]:
-            call_date = datetime.strptime(call["arrival_date"], "%Y-%m-%d").date()
-            if call_date >= reference_date:
-                upcoming_calls.append((call_date, call["call_id"], call))
+        if call["vessel_id"] != selected_vessel["vessel_id"]:
+            continue
+
+        call_date = parse_date(call["arrival_date"])
+
+        if call_date is None:
+            print(f"Invalid date for port call {call['call_id']}. Skipping.")
+            continue
+
+        if call_date >= reference_date:
+            upcoming_calls.append((call_date, call["call_id"], call))
+
     if not upcoming_calls:
         print("No upcoming port calls found.")
         return
-    
-    upcoming_calls.sort()
+
+    upcoming_calls.sort(key=lambda item: (item[0], item[1]))
+
+    selected_call_date = upcoming_calls[0][0]
     selected_call = upcoming_calls[0][2]
-        
+
     manifests = load_manifests("dataset/manifests")
     manifest = find_manifest(manifests, selected_call["call_id"])
+
     if manifest is None:
         print("Manifest unavailable.")
         return
-    
-    call_date = datetime.strptime(selected_call["arrival_date"], "%Y-%m-%d").date()
-    
-    print(f"Manifest for {selected_vessel['name']} | Call {selected_call['call_id']} | {call_date.strftime('%d %B %Y')}")
+
+    print(
+        f"Manifest for {selected_vessel['name']} | "
+        f"Call {selected_call['call_id']} | "
+        f"{selected_call_date.strftime('%d %B %Y')}"
+    )
     
     shipments = load_shipments("dataset/shipments")
     declared_count = 0
@@ -115,7 +129,7 @@ def export_customer_profile():
     customer_shipments = []
     
     for shipment in shipments:
-        if shipment["customer"].lower == customer_name.lower():
+        if shipment["customer"].lower() == customer_name.lower():
             customer_shipments.append(shipment)
     if len(customer_shipments) == 0:
         print("Customer not found.")
@@ -188,7 +202,7 @@ def find_port_calls_by_month():
         break
     
     port_calls = load_port_calls("dataset/port_calls.csv")
-    vessels = load_vessels("dataset/vessels")
+    vessels, _ = load_vessels("dataset/vessels")
     
     matching_calls = []
     
@@ -215,7 +229,7 @@ def find_port_calls_by_month():
         print("No port calls found.")
         return
     month_name = calendar.month_name[month]
-    print(f"Port calls in {month_name}")
+    print(f"Port calls in {month_name}:")
     for call in matching_calls:
         date_text = call["arrival_date"].strftime("%d %B %Y")
         print(f"- {date_text} | {call['vessel_name']} | {call['port_code']} | {call['call_id']}")
@@ -304,7 +318,7 @@ def assess_weather_risk():
             continue
         arrival_date = parse_date(call["arrival_date"])
         if arrival_date is None:
-            print(f"Invalid date for port call {call['call_id']}. Skipping")
+            print(f"Invalid date for port call {call['call_id']}. Skipping.")
             continue
         if arrival_date >= reference_date:
             upcoming_calls.append({
@@ -312,7 +326,9 @@ def assess_weather_risk():
                 "port_code": call["port_code"],
                 "arrival_date": arrival_date
             })
-    upcoming_calls.sort(key=lambda call: (call["arrival_date"], call["call_id"]))
+    upcoming_calls.sort(
+            key=lambda call: (call["arrival_date"], call["call_id"])
+        )
     if len(upcoming_calls) == 0: print("No upcoming port calls found."); return
     
     weather_rows = load_weather("dataset/weather.csv")
@@ -343,7 +359,7 @@ def search_incident_reports():
     
     index, titles = load_or_build_incident_index(incidents)
     query = input("Search incident reports: ").strip()
-    matches = search_incident_index(index, titles, query)
+    matches = search_incident_index(index, titles, query) or []
     print(f"Matches for '{query}':")
     
     for match in matches:
@@ -394,7 +410,4 @@ def main():
             search_incident_reports()
         elif service == 10:
             print("Console closed. HarborFlow operational data remains safe.")
-            console_running = False
-               
-if __name__ == "__main__":
-    main()
+            console_running = False   

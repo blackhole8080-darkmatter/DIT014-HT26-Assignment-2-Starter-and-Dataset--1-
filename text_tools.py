@@ -116,5 +116,6 @@ def search_incident_index(index, titles, query):
                 "score": score,
                 "title": titles[incident_id]
             })
-    matches.sort(key=lambda match: (-match["score"], match["incident_id"]))          
-    return matches           
+    matches.sort(key=lambda match: (-match["score"], match["incident_id"]))
+    
+    return matches          
