@@ -14,15 +14,30 @@ def load_json(path):
 def load_vessels(directory):
     registered_vessels = []
     skipped_vessels = 0
-    
+
     for path in Path(directory).iterdir():
-        if path.suffix == ".json":
+        if path.suffix.lower() != ".json":
+            continue
+
+        try:
             vessel = load_json(path)
-            if isinstance(vessel, dict) and "vessel_id" in vessel and "name" in vessel and "imo" in vessel and "capacity_teu" in vessel:
-                registered_vessels.append(vessel)
-            else:
-                skipped_vessels += 1
+        except (json.JSONDecodeError, OSError):
+            skipped_vessels += 1
+            continue
+
+        if (
+            isinstance(vessel, dict)
+            and all(
+                key in vessel
+                for key in ("vessel_id", "name", "imo", "capacity_teu")
+            )
+        ):
+            registered_vessels.append(vessel)
+        else:
+            skipped_vessels += 1
+
     return registered_vessels, skipped_vessels
+
 
 def load_port_calls(path):
     port_calls = []

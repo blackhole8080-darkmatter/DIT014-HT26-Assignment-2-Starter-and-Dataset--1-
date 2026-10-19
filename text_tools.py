@@ -34,18 +34,27 @@ def find_longest_stable_sequence(event_codes):
 def build_incident_index(incidents):
     index = {}
     titles = {}
-    
+
     for incident in incidents:
         incident_id = incident["incident_id"]
         titles[incident_id] = incident["title"]
-        with open(incident["report"], "r", encoding="utf-8") as file:
-            report_text = file.read()
+
+        report_value = incident["report"]
+
+        # Use the value directly if it contains report text.
+        # Read from disk only if it is a valid file path.
+        if isinstance(report_value, str) and os.path.isfile(report_value):
+            with open(report_value, "r", encoding="utf-8") as file:
+                report_text = file.read()
+        else:
+            report_text = report_value
+
         words = normalize_words(report_text)
-        
+
         for word in set(words):
             if incident_id not in index.setdefault(word, []):
                 index[word].append(incident_id)
-                
+
     return index, titles
 
 def sort_incident_index(index, titles):
@@ -72,14 +81,24 @@ def save_incident_index(index, titles):
 def incident_cache_is_current(incidents):
     if not os.path.exists(INDEX_PATH):
         return False
-    
+
     cache_modified = os.path.getmtime(INDEX_PATH)
-    
+
     for incident in incidents:
-        if os.path.getmtime(incident["report"]) > cache_modified:
+        report_value = incident.get("report")
+
+        # Report text has no file modification time, so rebuild the cache.
+        if not isinstance(report_value, str) or not os.path.isfile(report_value):
             return False
-    
+
+        try:
+            if os.path.getmtime(report_value) > cache_modified:
+                return False
+        except OSError:
+            return False
+
     return True
+
 
 def load_or_build_incident_index(incidents):
     if incident_cache_is_current(incidents):
@@ -118,4 +137,6 @@ def search_incident_index(index, titles, query):
             })
     matches.sort(key=lambda match: (-match["score"], match["incident_id"]))
     
-    return matches          
+    return matches 
+
+         

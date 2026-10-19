@@ -236,40 +236,55 @@ def find_port_calls_by_month():
 
 def sanitize_incident_report():
     incidents = load_incidents("dataset/incidents")
-    sorted_incidents = sorted(incidents, key=lambda incident: incident["title"].lower())
+    sorted_incidents = sorted(
+        incidents, key=lambda incident: incident["title"].lower()
+    )
+
     print("Incidents:")
-    
-    for index, incident in enumerate(sorted_incidents,start=1):
+
+    for index, incident in enumerate(sorted_incidents, start=1):
         print(f"{index}. {incident['title']}")
-    
+
     while True:
         selection_input = input("Select incident number: ").strip()
+
         if not selection_input.isdigit():
             print("Error - Select a listed incident.")
             continue
+
         selection = int(selection_input)
+
         if selection < 1 or selection > len(sorted_incidents):
             print("Error - Select a listed incident.")
             continue
+
         break
-    
+
     selected_incident = sorted_incidents[selection - 1]
-    report_path = selected_incident["report"]
-    with open(report_path, "r", encoding="utf-8") as file:
-        report_text = file.read()
-    
+    report_value = selected_incident["report"]
+
+    # Use report text directly if "report" is not a valid file path.
+    if os.path.isfile(report_value):
+        with open(report_value, "r", encoding="utf-8") as file:
+            report_text = file.read()
+    else:
+        report_text = report_value
+
     sanitized_text = re.sub(CONTAINER_PATTERN, "[CONTAINER]", report_text)
     sanitized_text = re.sub(SEAL_PATTERN, "[SEAL]", sanitized_text)
     sanitized_text = re.sub(EMAIL_PATTERN, "[EMAIL]", sanitized_text)
-    if sanitized_text == report_text:
-        print("Incident contains no share-sensitive identifiers.")
-        return         
 
     os.makedirs("exports/sanitized", exist_ok=True)
-    output_path = (f"exports/sanitized/{selected_incident['incident_id']}-sanitized.txt")
-    
+    output_path = (
+        f"exports/sanitized/"
+        f"{selected_incident['incident_id']}-sanitized.txt"
+    )
+
     with open(output_path, "w", encoding="utf-8") as file:
         file.write(sanitized_text)
+
+    print("Incident sanitized:")
+    print(sanitized_text)
     print(f"Sanitized report saved: {output_path}")
 
 def analyze_stable_event_sequence(): 
@@ -411,3 +426,6 @@ def main():
         elif service == 10:
             print("Console closed. HarborFlow operational data remains safe.")
             console_running = False   
+
+if __name__ == "__main__":
+    main()
