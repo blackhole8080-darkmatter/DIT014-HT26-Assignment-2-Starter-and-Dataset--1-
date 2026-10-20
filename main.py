@@ -1,13 +1,14 @@
 """HarborFlow Assignment 2 starter entry point."""
-from data_access import load_vessels, load_manifests, load_port_calls, load_shipments, load_incidents, load_weather 
+
 from datetime import datetime
-from operations import classify_shipment, find_shipment, find_manifest, parse_date, find_vessel_name, parse_weather_numbers, build_weather_recommendations
-from text_tools import CONTAINER_PATTERN, SEAL_PATTERN, EMAIL_PATTERN, find_longest_stable_sequence, load_or_build_incident_index, search_incident_index
 import os, csv, calendar, re
+import data_access as da
+import operations as op
+import text_tools as ttools
 
 # connecting the vessels data to the main with the handle list function
 def handle_list_vessels():
-    vessels, skipped = load_vessels("dataset/vessels")
+    vessels, skipped = da.load_vessels("dataset/vessels")
     print(f"Registered HarborFlow vessels:")
     
     sorted_vessels = sorted(vessels, key=lambda vessel: vessel["name"].lower() )
@@ -16,7 +17,7 @@ def handle_list_vessels():
     print(f"Skipped vessel files: {skipped}")
 
 def inspect_vessel():
-    vessels, skipped = load_vessels("dataset/vessels")
+    vessels, skipped = da.load_vessels("dataset/vessels")
     vessel_name = input("Vessel name: ").strip()
     selected_vessel = None
     
@@ -35,14 +36,14 @@ def inspect_vessel():
         except ValueError:
             print("Error - Date must use YYYY-MM-DD.") 
     
-    port_calls = load_port_calls("dataset/port_calls.csv")
+    port_calls = da.load_port_calls("dataset/port_calls.csv")
     upcoming_calls = []
 
     for call in port_calls:
         if call["vessel_id"] != selected_vessel["vessel_id"]:
             continue
 
-        call_date = parse_date(call["arrival_date"])
+        call_date = op.parse_date(call["arrival_date"])
 
         if call_date is None:
             print(f"Invalid date for port call {call['call_id']}. Skipping.")
@@ -60,8 +61,8 @@ def inspect_vessel():
     selected_call_date = upcoming_calls[0][0]
     selected_call = upcoming_calls[0][2]
 
-    manifests = load_manifests("dataset/manifests")
-    manifest = find_manifest(manifests, selected_call["call_id"])
+    manifests = da.load_manifests("dataset/manifests")
+    manifest = op.find_manifest(manifests, selected_call["call_id"])
 
     if manifest is None:
         print("Manifest unavailable.")
@@ -73,12 +74,12 @@ def inspect_vessel():
         f"{selected_call_date.strftime('%d %B %Y')}"
     )
     
-    shipments = load_shipments("dataset/shipments")
+    shipments = da.load_shipments("dataset/shipments")
     declared_count = 0
     missing_count = 0
     resolved_weight = 0.0
     for number, shipment_id in enumerate(manifest["shipment_ids"], start=1):
-        shipment = find_shipment(shipments, shipment_id)
+        shipment = op.find_shipment(shipments, shipment_id)
         if shipment is None:
             print(f"{number}. {shipment_id} | MISSING RECORD")
             missing_count += 1
@@ -95,7 +96,7 @@ def inspect_vessel():
 
 def identify_priority_cargo():
     call_id = input("Port call ID: ").strip() 
-    port_calls = load_port_calls("dataset/port_calls.csv")
+    port_calls = da.load_port_calls("dataset/port_calls.csv")
     selected_call = None
     
     for call in port_calls:
@@ -104,19 +105,19 @@ def identify_priority_cargo():
             break
     if selected_call is None: print("Port call not found."); return
 
-    manifests = load_manifests("dataset/manifests")
-    manifest = find_manifest(manifests, selected_call["call_id"])
+    manifests = da.load_manifests("dataset/manifests")
+    manifest = op.find_manifest(manifests, selected_call["call_id"])
     if manifest is None: print("Manifest unavailable."); return
     
-    shipments = load_shipments("dataset/shipments")
+    shipments = da.load_shipments("dataset/shipments")
     category_totals = { "CONTROLLED": 0, "COLD CHAIN": 0, "EXPEDITE": 0, "STANDARD": 0}
     
     for shipment_id in manifest["shipment_ids"]:
-        shipment = find_shipment(shipments, shipment_id)
+        shipment = op.find_shipment(shipments, shipment_id)
         
         if shipment is None: continue
         
-        category, reason = classify_shipment(shipment)
+        category, reason = op.classify_shipment(shipment)
         category_totals[category] += 1
         
         print(f"{shipment_id} | {category} | {reason}")
@@ -125,7 +126,7 @@ def identify_priority_cargo():
 
 def export_customer_profile():
     customer_name = input("Customer name: ").strip()
-    shipments = load_shipments("dataset/shipments")
+    shipments = da.load_shipments("dataset/shipments")
     customer_shipments = []
     
     for shipment in shipments:
@@ -201,19 +202,19 @@ def find_port_calls_by_month():
             continue
         break
     
-    port_calls = load_port_calls("dataset/port_calls.csv")
-    vessels, _ = load_vessels("dataset/vessels")
+    port_calls = da.load_port_calls("dataset/port_calls.csv")
+    vessels, _ = da.load_vessels("dataset/vessels")
     
     matching_calls = []
     
     for call in port_calls:
-        arrival_date = parse_date(call["arrival_date"])
+        arrival_date = op.parse_date(call["arrival_date"])
         
         if arrival_date is None:
             print(f"Invalid date for port call {call['call_id']}. Skipping.")
             continue
         
-        vessel_name = find_vessel_name(vessels, call["vessel_id"])
+        vessel_name = op.find_vessel_name(vessels, call["vessel_id"])
         if vessel_name is None:
             print(f"Unknown vessel ID for port call {call['call_id']}. Skipping.")
             continue
@@ -235,7 +236,7 @@ def find_port_calls_by_month():
         print(f"- {date_text} | {call['vessel_name']} | {call['port_code']} | {call['call_id']}")
 
 def sanitize_incident_report():
-    incidents = load_incidents("dataset/incidents")
+    incidents = da.load_incidents("dataset/incidents")
     sorted_incidents = sorted(
         incidents, key=lambda incident: incident["title"].lower()
     )
@@ -270,9 +271,9 @@ def sanitize_incident_report():
     else:
         report_text = report_value
 
-    sanitized_text = re.sub(CONTAINER_PATTERN, "[CONTAINER]", report_text)
-    sanitized_text = re.sub(SEAL_PATTERN, "[SEAL]", sanitized_text)
-    sanitized_text = re.sub(EMAIL_PATTERN, "[EMAIL]", sanitized_text)
+    sanitized_text = re.sub(ttools.CONTAINER_PATTERN, "[CONTAINER]", report_text)
+    sanitized_text = re.sub(ttools.SEAL_PATTERN, "[SEAL]", sanitized_text)
+    sanitized_text = re.sub(ttools.EMAIL_PATTERN, "[EMAIL]", sanitized_text)
 
     os.makedirs("exports/sanitized", exist_ok=True)
     output_path = (
@@ -289,7 +290,7 @@ def sanitize_incident_report():
 
 def analyze_stable_event_sequence(): 
     call_id = input("Port call ID: ").strip()
-    port_calls = load_port_calls("dataset/port_calls.csv")
+    port_calls = da.load_port_calls("dataset/port_calls.csv")
     
     selected_call = None
     for call in port_calls:
@@ -298,19 +299,19 @@ def analyze_stable_event_sequence():
             break
     if selected_call is None: print("Port call not found."); return
     
-    manifests = load_manifests("dataset/manifests")
-    manifest = find_manifest(manifests, selected_call["call_id"])
+    manifests = da.load_manifests("dataset/manifests")
+    manifest = op.find_manifest(manifests, selected_call["call_id"])
     if manifest is None: print("Manifest unavailable."); return
     
     event_codes = manifest["event_codes"]
-    stable_sequence = find_longest_stable_sequence(event_codes)
+    stable_sequence = ttools.find_longest_stable_sequence(event_codes)
     
     print(f"Longest stable sequence length: {len(stable_sequence)}")
     print(f"Sequence: {' -> '.join(stable_sequence)}")
 
 def assess_weather_risk():
     vessel_name = input("Vessel name: ").strip()
-    vessels, _ = load_vessels("dataset/vessels")
+    vessels, _ = da.load_vessels("dataset/vessels")
     selected_vessel = None
     
     for vessel in vessels:
@@ -325,13 +326,13 @@ def assess_weather_risk():
             break
         except ValueError:
             print("Error - Date must use YYYY-MM-DD.")
-    port_calls = load_port_calls("dataset/port_calls.csv")
+    port_calls = da.load_port_calls("dataset/port_calls.csv")
     upcoming_calls = []
     
     for call in port_calls:
         if call["vessel_id"] != selected_vessel["vessel_id"]:
             continue
-        arrival_date = parse_date(call["arrival_date"])
+        arrival_date = op.parse_date(call["arrival_date"])
         if arrival_date is None:
             print(f"Invalid date for port call {call['call_id']}. Skipping.")
             continue
@@ -346,10 +347,10 @@ def assess_weather_risk():
         )
     if len(upcoming_calls) == 0: print("No upcoming port calls found."); return
     
-    weather_rows = load_weather("dataset/weather.csv")
+    weather_rows = da.load_weather("dataset/weather.csv")
     forecast_lookup = {}
     for weather in weather_rows:
-        forecast_date = parse_date(weather["date"])
+        forecast_date = op.parse_date(weather["date"])
         if forecast_date is None:
             print(f"Invalid date in weather data. Skipping.")
             continue
@@ -362,19 +363,19 @@ def assess_weather_risk():
         forecast = forecast_lookup.get((call["port_code"], call["arrival_date"]))        
         if forecast is None: print("Forecast unavailable"); continue
         
-        weather_values = parse_weather_numbers(forecast)
+        weather_values = op.parse_weather_numbers(forecast)
         if weather_values is None: print("Malformed weather forecast. Skipping."); continue 
         
         wind, waves, rain = weather_values
         print(f"Wind: {wind:.1f} km/h | Rain: {rain:.1f} mm | Waves: {waves:.1f} m")
-        print(f"Recommendation: {build_weather_recommendations(wind, waves, rain)}")
+        print(f"Recommendation: {op.build_weather_recommendations(wind, waves, rain)}")
 
 def search_incident_reports():
-    incidents = load_incidents("dataset/incidents")
+    incidents = da.load_incidents("dataset/incidents")
     
-    index, titles = load_or_build_incident_index(incidents)
+    index, titles = ttools.load_or_build_incident_index(incidents)
     query = input("Search incident reports: ").strip()
-    matches = search_incident_index(index, titles, query) or []
+    matches = ttools.search_incident_index(index, titles, query) or []
     print(f"Matches for '{query}':")
     
     for match in matches:
